@@ -4,12 +4,16 @@ import ch.swaechter.smbjwrapper.core.AbstractSharedItem;
 import ch.swaechter.smbjwrapper.core.SharedItem;
 import ch.swaechter.smbjwrapper.utils.ShareUtils;
 import com.hierynomus.msdtyp.AccessMask;
+import com.hierynomus.msfscc.FileAttributes;
 import com.hierynomus.msfscc.fileinformation.FileAllInformation;
 import com.hierynomus.msfscc.fileinformation.FileIdBothDirectoryInformation;
 import com.hierynomus.mssmb2.SMB2CreateDisposition;
 import com.hierynomus.mssmb2.SMB2ShareAccess;
 import com.hierynomus.smbj.share.Directory;
+import com.hierynomus.smbj.share.DiskShare;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedList;
@@ -208,6 +212,35 @@ public final class SharedDirectory extends AbstractSharedItem<SharedDirectory> {
             }
         }
         return sharedItems;
+    }
+
+    public List<String> listFilesSMB(String path) {
+        List<String> files = new ArrayList<>();
+        try (DiskShare share = getDiskShare()) {
+            listFiles(share, path, files);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return files;
+    }
+
+    private void listFiles(DiskShare share, String path, Collection<String> files) {
+        List<String> dirs = new ArrayList<>();
+        String extPath = path.isEmpty() ? path : path + "\\";
+        for (FileIdBothDirectoryInformation f : share.list(path)) {
+            if ((f.getFileAttributes() & FileAttributes.FILE_ATTRIBUTE_DIRECTORY.getValue()) != 0) {
+                if (!isSpecialDir(f.getFileName())) {
+                    dirs.add(f.getFileName());
+                }
+            } else {
+                files.add(extPath + f.getFileName());
+            }
+        }
+        dirs.forEach(dir -> listFiles(share, extPath + dir, files));
+    }
+
+    private static boolean isSpecialDir(String fileName) {
+        return fileName.equals(".") || fileName.equals("..");
     }
 
     /**
